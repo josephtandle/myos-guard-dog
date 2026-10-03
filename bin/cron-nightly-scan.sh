@@ -9,6 +9,7 @@
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 GUARD_DOG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Fallback only: explicit config.scanRoots (myos-guard-dog setup) win over this.
 WORKSPACE="${GUARDOG_WORKSPACE:-$HOME}"
 LOG_DATE=$(date '+%Y-%m-%d %H:%M:%S')
 

@@ -13,6 +13,8 @@ import { assertSupportedNodeVersion } from '../src/node-version.js';
 assertSupportedNodeVersion();
 
 const skipDirs = new Set(['node_modules', '.git', '.next', 'dist', 'build', 'coverage', '.venv', 'venv']);
+// Child-scan messages that mean "nothing to verify here", not "the scan broke".
+const COVERAGE_GAP = /^(No npm lockfile or installed dependency inventory is available|No exact installed or locked version for |scan coverage incomplete)/i;
 // Skipped only when they sit directly under the user's home directory.
 const homeOnlySkipDirs = new Set(['Library', 'Applications', 'Movies', 'Music', 'Pictures']);
 function realPathOrNull(target) {
@@ -44,7 +46,9 @@ export function runNightly(options = {}) {
 function performNightly(options) {
   const config = options.config || loadUserConfig();
   const deadline = Date.now() + (options.timeoutMs ?? 3600000);
-  const roots = options.roots || (process.env.GUARDOG_WORKSPACE ? [resolve(process.env.GUARDOG_WORKSPACE)] : config.scanRoots || []);
+  // Explicit scan roots in config win. GUARDOG_WORKSPACE is the fallback for an
+  // install that never chose roots (the legacy cron wrapper passes $HOME).
+  const roots = options.roots || (config.scanRoots?.length ? config.scanRoots : process.env.GUARDOG_WORKSPACE ? [resolve(process.env.GUARDOG_WORKSPACE)] : []);
   const run = options.run || spawnSync;
   let preflight;
   try {
@@ -54,7 +58,7 @@ function performNightly(options) {
   } catch (error) {
     preflight = { checkedAt: new Date().toISOString(), ok: false, repairs: [], issues: ['Health preflight failed: ' + error.message] };
   }
-  const receipt = { taskClass: 'security_scan', startedAt: new Date().toISOString(), status: 'incomplete', roots, projectsScanned: 0, dependencyCount: 0, dangerousCount: 0, preflight, issues: preflight.issues.map(issue => 'Health: ' + issue), boundaries: { depthLimited: 0, unreadable: 0, samples: [] } };
+  const receipt = { taskClass: 'security_scan', startedAt: new Date().toISOString(), status: 'incomplete', roots, projectsScanned: 0, dependencyCount: 0, dangerousCount: 0, preflight, issues: preflight.issues.map(issue => 'Health: ' + issue), boundaries: { depthLimited: 0, unreadable: 0, samples: [] }, coverage: { projectsWithoutInventory: 0, samples: [] } };
   const manifests = new Set();
   const visited = new Set();
   const maxDepth = Number(process.env.GUARDOG_MAX_DEPTH || 4);
@@ -116,8 +120,18 @@ function performNightly(options) {
       receipt.dangerousCount += Number(summary.dangerousCount) || 0;
       if (summary.status === 'dangerous' && !summary.dangerousCount) receipt.dangerousCount++;
       const expectedExit = { complete: 0, dangerous: 1, incomplete: 2 }[summary.status];
-      if (summary.status === 'incomplete' || result.status !== expectedExit) receipt.issues.push('Incomplete or inconsistent scan: ' + manifest);
-      for (const issue of summary.issues || []) receipt.issues.push(manifest + ': ' + (typeof issue === 'string' ? issue : JSON.stringify(issue)));
+      const issueTexts = (summary.issues || []).map((issue) => (typeof issue === 'string' ? issue : JSON.stringify(issue)));
+      // A project with no lockfile or installed inventory (a scratch folder, a
+      // checkout never installed) is a coverage gap, not a failed night. Record
+      // it under coverage and keep the receipt complete.
+      const coverageOnly = summary.status === 'incomplete' && result.status === expectedExit && !summary.dangerousCount && issueTexts.length > 0 && issueTexts.every((text) => COVERAGE_GAP.test(text));
+      if (coverageOnly) {
+        receipt.coverage.projectsWithoutInventory += 1;
+        if (receipt.coverage.samples.length < 20) receipt.coverage.samples.push(manifest + ': ' + issueTexts[0]);
+      } else {
+        if (summary.status === 'incomplete' || result.status !== expectedExit) receipt.issues.push('Incomplete or inconsistent scan: ' + manifest);
+        for (const text of issueTexts) receipt.issues.push(manifest + ': ' + text);
+      }
       if (summary.quotaExhausted === true) {
         receipt.issues.push('VirusTotal daily quota exhausted. Stopped remaining project scans to preserve the next UTC-day allowance.');
         break;
