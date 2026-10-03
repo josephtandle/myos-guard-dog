@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readdirSync, realpathSync, statSync, writeFileSync, renameSync, readFileSync, openSync, closeSync, unlinkSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { ensureGuardogHome, guardogHome, packageRoot } from '../src/paths.js';
@@ -12,6 +13,11 @@ import { assertSupportedNodeVersion } from '../src/node-version.js';
 assertSupportedNodeVersion();
 
 const skipDirs = new Set(['node_modules', '.git', '.next', 'dist', 'build', 'coverage', '.venv', 'venv']);
+// Skipped only when they sit directly under the user's home directory.
+const homeOnlySkipDirs = new Set(['Library', 'Applications', 'Movies', 'Music', 'Pictures']);
+function realPathOrNull(target) {
+  try { return realpathSync(target); } catch { return null; }
+}
 
 export function runNightly(options = {}) {
   ensureGuardogHome();
@@ -48,23 +54,40 @@ function performNightly(options) {
   } catch (error) {
     preflight = { checkedAt: new Date().toISOString(), ok: false, repairs: [], issues: ['Health preflight failed: ' + error.message] };
   }
-  const receipt = { taskClass: 'security_scan', startedAt: new Date().toISOString(), status: 'incomplete', roots, projectsScanned: 0, dependencyCount: 0, dangerousCount: 0, preflight, issues: preflight.issues.map(issue => 'Health: ' + issue) };
+  const receipt = { taskClass: 'security_scan', startedAt: new Date().toISOString(), status: 'incomplete', roots, projectsScanned: 0, dependencyCount: 0, dangerousCount: 0, preflight, issues: preflight.issues.map(issue => 'Health: ' + issue), boundaries: { depthLimited: 0, unreadable: 0, samples: [] } };
   const manifests = new Set();
   const visited = new Set();
   const maxDepth = Number(process.env.GUARDOG_MAX_DEPTH || 4);
+  const homeIdentity = realPathOrNull(options.homeDirectory || homedir());
   function discover(dir, depth = 0) {
     if (Date.now() >= deadline) { receipt.issues.push('Nightly discovery time budget exhausted.'); return; }
-    if (depth > maxDepth) { receipt.issues.push('Discovery depth exceeded: ' + dir); return; }
+    // Reaching the depth limit is a boundary of the scan, not a failure: count it
+    // so the receipt says how much was left unexplored, and stay "complete".
+    if (depth > maxDepth) { noteBoundary('depthLimited', dir); return; }
     try {
       const identity = realpathSync(dir);
       if (identity === realpathSync(guardogHome()) || visited.has(identity)) return;
       visited.add(identity);
+      const atHome = identity === homeIdentity;
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const full = join(dir, entry.name);
-        if (entry.isDirectory() && !skipDirs.has(entry.name) && !entry.name.startsWith('.')) discover(full, depth + 1);
-        else if (entry.isFile() && entry.name === 'package.json') manifests.add(full);
+        if (!entry.isDirectory()) { if (entry.isFile() && entry.name === 'package.json') manifests.add(full); continue; }
+        if (skipDirs.has(entry.name) || entry.name.startsWith('.')) continue;
+        // ~/Library is app data (caches, containers, mail), not code. Walking it
+        // costs minutes and trips macOS privacy guards (EPERM) on every run.
+        if (atHome && homeOnlySkipDirs.has(entry.name)) continue;
+        discover(full, depth + 1);
       }
-    } catch (error) { receipt.issues.push('Cannot read ' + dir + ': ' + (error.code || error.message)); }
+    } catch (error) {
+      // A folder the user cannot read (macOS privacy guards, another account's
+      // data) is a boundary too, unless it is a scan root, which stays an issue.
+      if (depth === 0) receipt.issues.push('Cannot read ' + dir + ': ' + (error.code || error.message));
+      else noteBoundary('unreadable', dir + ': ' + (error.code || error.message));
+    }
+  }
+  function noteBoundary(kind, detail) {
+    receipt.boundaries[kind] += 1;
+    if (receipt.boundaries.samples.length < 20) receipt.boundaries.samples.push(kind + ': ' + detail);
   }
   if (!Number.isInteger(maxDepth) || maxDepth < 0 || maxDepth > 30) receipt.issues.push('GUARDOG_MAX_DEPTH must be an integer from 0 to 30.');
   else for (const root of roots) {
