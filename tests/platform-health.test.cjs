@@ -104,8 +104,10 @@ test('Windows registration sends XML to schtasks without a shell and checks read
   process.env.GUARDOG_HOME = path.join(root, 'state');
   let registered = '';
   const run = (command, args, options) => {
-    assert.equal(command, 'schtasks.exe');
+    assert.ok(command.endsWith('\\System32\\schtasks.exe'));
     assert.equal(options.shell, false);
+    assert.ok(!options.env.VIRUSTOTAL_API_KEY);
+    assert.ok(!options.env.GITHUB_API_TOKEN);
     if (args[0] === '/Create') {
       registered = fs.readFileSync(args[args.indexOf('/XML') + 1], 'utf16le');
       return { status: 0, stdout: '' };

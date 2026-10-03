@@ -1,5 +1,20 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const { resolve } = require('node:path');
+
+test('batch exit status distinguishes danger, incomplete checks and complete checks', async () => {
+  const { auditExitCode } = await import('../src/scan-summary.js');
+  assert.equal(auditExitCode([{ decision: { action: 'BARK', coverage: 'complete' } }]), 1);
+  assert.equal(auditExitCode([{ decision: { action: 'SILENT', coverage: 'incomplete' } }]), 2);
+  assert.equal(auditExitCode([{ decision: { action: 'WHINE', threat: 'SUSPICIOUS', coverage: 'complete' } }]), 2);
+  assert.equal(auditExitCode([{ decision: { action: 'SILENT', threat: 'SAFE', coverage: 'complete' } }]), 0);
+});
+
+test('unknown CLI commands exit nonzero', () => {
+  const result = spawnSync(process.execPath, [resolve(__dirname, '../src/index.js'), 'analyse', 'fixture'], { encoding: 'utf8' });
+  assert.equal(result.status, 2);
+});
 
 test('danger preserves incomplete coverage and package failure diagnostics', async () => {
   const { summarizeDependencyScan } = await import('../src/scan-summary.js');

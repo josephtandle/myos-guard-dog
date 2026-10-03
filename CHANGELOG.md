@@ -2,6 +2,11 @@
 
 ## 4.0.4
 
+- Resolve Windows helpers by absolute system path, reject project-local npm entry points, and keep Guard Dog credentials out of helper and npm child environments.
+- Treat non-registry and unproven dependency origins, lock and install mismatches, and installed-only packages as incomplete inventory coverage.
+- Block UNCONFIRMED installs, distinguish unsupported repository hosts, scope trusted names to their ecosystem, and use canonical GitHub repository names after redirects.
+- Make batch and command failures visible in exit codes; recover abandoned quota locks, fail closed on corrupt ledgers, and write quota records atomically.
+- Require the exact PyPI distribution hash for multi-file releases and state the metadata-only scope of pattern checks in output and docs.
 - Bound package-batch analysis to four concurrent packages while preserving order and VirusTotal API-key pacing.
 - Detect legacy `# guarddog-nightly` cron entries and preserve customized schedules.
 - Make scan-root regression coverage portable across Windows, macOS and Linux.

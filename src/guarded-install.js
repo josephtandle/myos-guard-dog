@@ -1,7 +1,8 @@
-import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync, lstatSync, renameSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync, lstatSync, renameSync, realpathSync } from 'node:fs';
+import { join, dirname, relative, isAbsolute } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { childEnvironment } from './windows-process.js';
 
 const NAME = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/;
 const VERSION = /^\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/;
@@ -22,16 +23,24 @@ function readProjectFile(path) {
   return readFileSync(path, 'utf8');
 }
 
-function npmCommand(platform, runner) {
+function npmCommand(platform, projectRoot, nodeExecutable = process.execPath) {
   if (platform !== 'win32') return { command: 'npm', prefix: [] };
   // Execute npm's JavaScript entry point directly. Never interpolate package names
-  // or filesystem paths into cmd.exe, where shell metacharacters can execute.
-  const located = runner('where.exe', ['npm.cmd'], { encoding: 'utf8', shell: false });
-  for (const entry of (located.stdout || '').trim().split(/\r?\n/)) {
-    const cli = join(dirname(entry), 'node_modules', 'npm', 'bin', 'npm-cli.js');
-    if (existsSync(cli)) return { command: process.execPath, prefix: [cli] };
+  // or filesystem paths into cmd.exe. Bind npm to this Node installation, not PATH.
+  const project = realpathSync(projectRoot);
+  const node = realpathSync(nodeExecutable);
+  const cli = join(dirname(node), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+  if (!existsSync(cli) || !lstatSync(cli).isFile()) {
+    throw new Error('Could not locate npm-cli.js beside this Node installation. Repair Node.js/npm, then retry.');
   }
-  throw new Error('Could not locate npm-cli.js. Repair the Node.js/npm installation, then retry.');
+  const actual = realpathSync(cli);
+  for (const candidate of [node, actual]) {
+    const rel = relative(project, candidate);
+    if (!rel || (!rel.startsWith('..') && !isAbsolute(rel))) {
+      throw new Error('Node.js/npm inside this project cannot be used for a guarded install.');
+    }
+  }
+  return { command: node, prefix: [actual] };
 }
 
 async function downloadArtifact(url) {
@@ -80,12 +89,12 @@ export async function runGuardedInstall(args, GuardDogClass, options = {}) {
   for (const field of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
     for (const [name, version] of Object.entries(manifest[field] || {})) validateSpec(`${name}@${version}`);
   }
-  const npm = npmCommand(options.platform || process.platform, runner);
+  const npm = npmCommand(options.platform || process.platform, cwd, options.nodeExecutable);
   // Keep staging inside the project filesystem so approved files and node_modules
   // can be promoted with atomic renames after a successful staged npm ci.
   const staging = mkdtempSync(join(cwd, '.guardog-resolve-'));
   const execute = (argv, directory) => {
-    const result = runner(npm.command, [...npm.prefix, ...argv], { cwd: directory, shell: false, stdio: 'inherit' });
+    const result = runner(npm.command, [...npm.prefix, ...argv], { cwd: directory, shell: false, stdio: 'inherit', env: childEnvironment() });
     if (result.error || result.status !== 0) throw new Error(`npm ${argv[0]} failed: ${result.error?.message || `exit ${result.status}`}`);
   };
   try {

@@ -19,6 +19,7 @@ import { PatternAnalyzer } from './pattern-analyzer.js';
 import { DecisionTree } from './decision-tree.js';
 import { ensureGuardogHome, guardogDataDir, guardogEnvPath, packageRoot } from './paths.js';
 import { runGuardedInstall } from './guarded-install.js';
+import { auditExitCode } from './scan-summary.js';
 import { checkHealth } from './health.js';
 import {
   installGitHook,
@@ -77,6 +78,12 @@ export async function deriveVirusTotalTarget(reputationData, ecosystem) {
   } catch {
     return null;
   }
+}
+
+export function selectPyPiDistribution(registry, target = null) {
+  const files = registry?.distributions || [];
+  if (target) return files.find(file => file.sha256 && file.sha256.toLowerCase() === target.toLowerCase()) || null;
+  return files.length === 1 && files[0].sha256 ? files[0] : null;
 }
 
 export class GuardDog {
@@ -178,6 +185,14 @@ export class GuardDog {
 
     // Step 2: VirusTotal scan (if available)
     let vtTarget = target;
+    if (ecosystem === 'pypi' && reputationData?.registry) {
+      const selected = selectPyPiDistribution(reputationData.registry, target);
+      reputationData.registry.artifactCoverage = selected ? 'complete' : 'incomplete';
+      reputationData.registry.selectedDistribution = selected?.filename || null;
+      vtTarget = selected?.sha256 || null;
+      if (selected) console.log(`PyPI artifact selected: ${selected.filename}`);
+      else console.log('PyPI artifact coverage incomplete: choose the exact distribution SHA-256 for a multi-file release.');
+    }
     if (this.scanner) {
       if (!vtTarget && reputationData?.registry?.tarball) {
         vtTarget = await deriveVirusTotalTarget(reputationData, ecosystem);
@@ -224,10 +239,10 @@ export class GuardDog {
       console.error('✗ CVE check failed:', error.message);
     }
 
-    // Step 4: Pattern analysis (analyze install scripts / main entry if available from registry)
-    console.log('🔎 Analyzing code patterns...');
+    // Step 4: Check registry description text; package source is not inspected.
+    console.log('🔎 Checking registry description patterns...');
     try {
-      // Use registry metadata as a lightweight code signal source
+      // Only registry metadata text is available in this scan path.
       const codeSnippets = {};
       if (reputationData?.registry?.description) {
         codeSnippets['description'] = reputationData.registry.description;
@@ -237,22 +252,26 @@ export class GuardDog {
       console.log(`Metadata text checks complete (score: ${patternResults.totalScore}); package source files were not scanned.`);
     } catch (error) {
       console.error('✗ Pattern analysis failed:', error.message);
+      patternResults = { failed: true, scope: 'registry_description_only' };
     }
 
     // Step 5: Decision tree evaluation
     console.log('🎯 Evaluating threat level...');
     const decision = this.decisionTree.evaluate(
       scanResults, reputationData, packageName,
-      cveResults, patternResults ? { suspicious: patternResults.suspiciousFiles > 0, score: patternResults.totalScore, severity: patternResults.combinedSeverity } : null,
+      cveResults, patternResults ? { suspicious: patternResults.suspiciousFiles > 0, score: patternResults.totalScore, severity: patternResults.combinedSeverity, scope: patternResults.scope } : null,
       vtAttempted
     );
+    if (ecosystem === 'pypi' && reputationData?.registry?.selectedDistribution) {
+      decision.notes.push(`PyPI artifact verdict applies to ${reputationData.registry.selectedDistribution} only.`);
+    }
 
     // Print results
     console.log('\n' + this.decisionTree.formatDecision(decision));
 
     // Suggest code-level review for flagged packages
     if (decision.action === 'BARK' || decision.action === 'WHINE') {
-      console.log('\n💡 Code-level review: run /gstack-cso in Claude Code, or: bash bin/run-cso.sh <affected-path>');
+      console.log('\n💡 Review the exact package artifact and source before proceeding; this scan has not inspected package source files.');
     }
 
     const duration = Date.now() - startTime;
@@ -439,7 +458,8 @@ function updatesCommand(action, args = []) {
     console.log(result.message);
     process.exitCode = result.ok ? 0 : 2;
   } else {
-    printDoctor();
+    const health = printDoctor();
+    process.exitCode = health.ok ? 0 : 2;
   }
 }
 
@@ -447,17 +467,26 @@ function hooksCommand(action) {
   const config = loadUserConfig();
   if (action === 'enable') {
     const result = installGitHook();
-    config.gitPreCommitHook = result.ok;
-    saveUserConfig(config);
+    if (result.ok) {
+      config.gitPreCommitHook = true;
+      saveUserConfig(config);
+    }
     console.log(result.message);
+    process.exitCode = result.ok ? 0 : 2;
   } else if (action === 'disable') {
     const result = removeGitHook();
-    config.gitPreCommitHook = false;
-    saveUserConfig(config);
+    if (result.ok) {
+      config.gitPreCommitHook = false;
+      saveUserConfig(config);
+    }
     console.log(result.message);
-  } else {
+    process.exitCode = result.ok ? 0 : 2;
+  } else if (action === 'status') {
     console.log(`Git pre-commit hook: ${config.gitPreCommitHook ? 'enabled' : 'disabled'}`);
     console.log('Guarded installs: use `myos-guard-dog install <package>` before dependency installs.');
+  } else {
+    console.error(`Unknown hooks action: ${action}`);
+    process.exitCode = 2;
   }
 }
 
@@ -512,7 +541,7 @@ async function main(argv = process.argv.slice(2)) {
 
     const spec = packageName.match(/^(.+)@([^@]+)$/);
     const result = await guardDog.analyze(spec ? spec[1] : packageName, ecosystem, target, spec ? spec[2] : null);
-    process.exitCode = result.decision.action === 'BARK' ? 1 : result.decision.coverage === 'incomplete' ? 2 : 0;
+    process.exitCode = auditExitCode([result]);
   } else if (command === 'batch') {
     // Batch analyze from JSON file
     const guardDog = new GuardDog();
@@ -523,9 +552,11 @@ async function main(argv = process.argv.slice(2)) {
     }
 
     const packages = JSON.parse(readFileSync(filePath, 'utf-8'));
-    await guardDog.batchAnalyze(packages);
+    const results = await guardDog.batchAnalyze(packages);
+    process.exitCode = auditExitCode(results);
   } else {
     usage();
+    process.exitCode = !command || ['--help', '-h', 'help'].includes(command) ? 0 : 2;
   }
 }
 

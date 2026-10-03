@@ -36,3 +36,9 @@ export function summarizeDependencyScan(inventory, results) {
     issues
   };
 }
+
+export function auditExitCode(results) {
+  if (results.some(result => result.decision?.action === 'BARK')) return 1;
+  if (results.some(result => result.decision?.action !== 'SILENT' || result.decision?.threat !== 'SAFE' || result.decision?.coverage !== 'complete')) return 2;
+  return 0;
+}

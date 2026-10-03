@@ -44,7 +44,7 @@ myos-guard-dog analyze node-ipc@10.1.1 npm
 myos-guard-dog analyze requests@2.32.3 pypi
 ```
 
-Project audits read exact npm lockfile or installed metadata versions, including transitive dependencies. npm lockfile versions 1, 2 and 3 and shrinkwrap files are supported. Installed metadata takes precedence where present. Results distinguish installed from locked versions. A missing or unsupported inventory is incomplete, never a request to check latest instead. Python and Ruby packages can be analyzed individually; automatic project inventory currently covers npm.
+Project audits read exact npm lockfile versions, including transitive dependencies, and compare installed identity when present. npm lockfile versions 1, 2 and 3 and shrinkwrap files are supported. Non-registry or unproven origins, installed-only packages, and mismatches between installed metadata and the lock make coverage incomplete. Python and Ruby packages can be analyzed individually; automatic project inventory currently covers npm.
 
 ## VirusTotal and coverage
 
@@ -82,7 +82,7 @@ The computer must be available for its scheduler. Use `myos-guard-dog updates di
 
 ## Scope and verification
 
-Guard Dog protects the package workflow. It is not a replacement for operating-system antivirus and does not watch every file or process. Metadata pattern checks are not a full package-source review. No scan guarantees software is harmless.
+Guard Dog protects the package workflow. It is not a replacement for operating-system antivirus and does not watch every file or process. Pattern checks read registry description text, not package source or install scripts. This CLI queries OSV, registry metadata, GitHub metadata when linked, and optional VirusTotal reports; it does not query NVD or CISA KEV or run name-similarity detection. SILENT describes only those completed checks. No scan guarantees software is harmless. For PyPI releases with multiple distributions, provide the SHA-256 of the exact wheel or source archive to check; without one, artifact coverage is incomplete.
 
 `npm test` runs regression and real packed-install tests. CI runs these on Windows, macOS and Linux with Node 24. Scheduler tests exercise platform command construction and readback without installing real tasks. `npm run test:live` separately exercises public services and may consume API quota. See the release verification record for actual platform results.
 
