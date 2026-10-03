@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.0.4
+
+- Bound package-batch analysis to four concurrent packages while preserving order and VirusTotal API-key pacing.
+- Detect legacy `# guarddog-nightly` cron entries and preserve customized schedules.
+- Make scan-root regression coverage portable across Windows, macOS and Linux.
+
 ## 4.0.3
 
 - Declare POSIX installer and installed-hook tests unsupported on Windows, matching the product behavior, so cross-platform CI tests the supported surface without attempting to launch unavailable Bash commands.
