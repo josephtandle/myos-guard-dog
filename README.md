@@ -24,7 +24,7 @@ On Windows, substitute a quoted Windows folder such as `"C:\Users\You\Projects"`
 
 State lives in `~/.guardog` or `%USERPROFILE%\.guardog`, independently of the installation directory. `GUARDOG_HOME` selects another state folder. Upgrades preserve this state.
 
-The v4.1.0 command above is for use **after** the v4.1.0 tag is published. Until then, the latest verified public tag is v4.0.3.
+The v4.1.0 GitHub tag is the verified public source for this release. Check that the command resolves to the expected version before using it with student projects.
 
 ## A keyless first check
 

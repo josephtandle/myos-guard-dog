@@ -10,7 +10,7 @@ This review targets a student who wants to inspect a public npm package before i
 | [OpenSSF package-analysis](https://github.com/ossf/package-analysis) | Collects static and dynamic package behavior using isolated workers. | Do not execute downloaded package code in this cross-platform CLI. Dynamic analysis needs an actual sandbox and separate operational controls. |
 | [OpenSSF Scorecard](https://github.com/ossf/scorecard) | Assesses repository practices such as token permissions and vulnerability handling. | Treat repository health as context, never as proof that the published artifact is safe. |
 
-## Shipped in the v4.1.0 draft
+## Delivered in v4.1.0
 
 - `myos-guard-dog artifact npm:<name>@<exact-version>` checks the npm registry hostname, release identity and strong digest before a bounded static read of the archive. A local `.tgz` can also be inspected without a registry trust claim. No API key is needed.
 - Guarded npm installs inspect the same exact artifact bytes already bound to registry metadata and integrity. High-risk, review, or incomplete static findings stop the install before `npm ci`; lifecycle scripts stay disabled.
@@ -25,8 +25,8 @@ This review targets a student who wants to inspect a public npm package before i
 - Large dependency scans are bounded to four concurrent packages, but shared VirusTotal rate limits can dominate total time. No end-to-end speedup is promised for a 453-package project.
 - A source archive can have no listed indicators while still be malicious. GuardDog must keep reporting the evidence actually checked and cannot certify safety.
 
-## Evidence to review before release
+## Release verification evidence
 
 - Offline fixture tests cover safe, high-risk and incomplete archives; exact registry identity, host and digest rejection; and blocking a guarded install before project mutation.
 - Public package smoke checks used exact releases of lodash 4.17.21, axios 1.7.9 and esbuild 0.25.0. They exercised 1,048, 69 and 3 source files respectively without a high-risk finding; lifecycle scripts appeared as informational signals where present. These packages are a false-positive check, not a safety benchmark.
-- The exact proposed commit still needs a clean packed-install test, independent review of the archive parser, and Windows/macOS/Linux Node 24 CI before release.
+- The proposed commit passed the packed-install test and independent read-only review. That review found four scanner gaps, which were fixed and regression tested. Windows, macOS and Linux Node 24 CI passed for commit `6c4e692027b54abd401030e37c3dd5f20b8cb644`; release-wording changes were verified separately on the final commit.

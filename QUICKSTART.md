@@ -14,7 +14,7 @@ myos-guard-dog nightly
 myos-guard-dog doctor --repair
 ```
 
-Use this v4.1.0 install command only after its GitHub tag is published. Until then, v4.0.3 is the latest verified public tag.
+Use the published v4.1.0 GitHub tag and verify the installed version before scanning student projects.
 
 Start with a keyless, read-only check of an exact public npm release:
 
