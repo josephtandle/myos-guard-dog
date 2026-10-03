@@ -3,6 +3,7 @@ import { join, dirname, relative, isAbsolute } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { childEnvironment } from './windows-process.js';
+import { inspectNpmArtifact } from './npm-artifact-inspector.js';
 
 const NAME = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/;
 const VERSION = /^\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/;
@@ -71,6 +72,7 @@ export async function runGuardedInstall(args, GuardDogClass, options = {}) {
   const cwd = options.cwd || process.cwd();
   const runner = options.runner || spawnSync;
   const fetchArtifact = options.fetchArtifact || downloadArtifact;
+  const inspectArtifact = options.inspectArtifact || inspectNpmArtifact;
   const fetchMetadata = options.fetchMetadata || fetchRegistryMetadata;
   const supplied = [...args];
   if (supplied[0] === 'pip' || supplied[0] === 'pip3') {
@@ -138,6 +140,11 @@ export async function runGuardedInstall(args, GuardDogClass, options = {}) {
       if (seen.has(identity)) continue;
       const bytes = await fetchArtifact(url.href);
       if (createHash(integrity[1]).update(bytes).digest('base64') !== integrity[2]) throw new Error(`Artifact integrity mismatch for ${name}`);
+      const artifactCheck = inspectArtifact(bytes, { expectName: name, expectVersion: pkg.version });
+      if (artifactCheck.risk !== 'none') {
+        const finding = artifactCheck.findings.find(item => item.severity !== 'info');
+        throw new Error(`Install blocked by bounded artifact inspection for ${name}@${pkg.version}: ${finding?.file || 'archive'}: ${finding?.rule || artifactCheck.risk}`);
+      }
       const hash = createHash('sha256').update(bytes).digest('hex');
       const result = await dog.analyze(name, 'npm', hash, pkg.version);
       if (result?.decision?.installAllowed !== true) throw new Error(`Install blocked: ${name}@${pkg.version} was not explicitly approved. Resolve reported findings or incomplete checks and retry.`);

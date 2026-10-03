@@ -1,4 +1,4 @@
-# Install MyOS Guard Dog 4.0.4
+# Install MyOS Guard Dog 4.1.0
 
 Copy the prompt below into your AI assistant. It needs access to your computer's terminal.
 
@@ -10,7 +10,7 @@ Use this exact project: https://github.com/josephtandle/myos-guard-dog. MyOS Gua
 
 1. Detect my operating system, shell, Node version, existing installation, and project folder. Read the release instructions. Guard Dog requires Node 24 LTS and rejects other major versions so installs and support use the tested runtime. Preserve settings and credentials. Explain decisions in plain English.
 
-2. After confirming the official release tag and its commit, install with `npm install -g --ignore-scripts github:josephtandle/myos-guard-dog#v4.0.4`. Run `myos-guard-dog doctor --repair` immediately after installation so any previously enabled owned nightly runner is updated to this release. Verify `myos-guard-dog --version`. Existing `~/.guardog` state is preserved. Do not use `guarddog`, `guardog`, or `guard-dog`: they are ambiguous external names.
+2. After confirming the official v4.1.0 release tag and its commit actually exist, install with `npm install -g --ignore-scripts github:josephtandle/myos-guard-dog#v4.1.0`. Run `myos-guard-dog doctor --repair` immediately after installation so any previously enabled owned nightly runner is updated to this release. Verify `myos-guard-dog --version`. Existing `~/.guardog` state is preserved. Do not use `guarddog`, `guardog`, or `guard-dog`: they are ambiguous external names.
 
 3. Run `myos-guard-dog setup --quick`, then help me configure VirusTotal locally using `myos-guard-dog setup`. Never ask for an API key in chat, print it, or include it in a report. Without a key, vulnerability audits still run, but malware coverage is incomplete and guarded installation stays blocked. A stored key is not proof it works: run `myos-guard-dog test` and report the actual authentication and service results.
 
@@ -20,7 +20,7 @@ Use this exact project: https://github.com/josephtandle/myos-guard-dog. MyOS Gua
 
 6. Use `myos-guard-dog doctor --repair` for supported repairs. It can restore its local state and a previously enabled missing schedule. Daily runs also perform these checks and record repairs or unresolved health issues in their receipt. Check the result after every repair. Stop retrying after two failed attempts, preserve diagnostic evidence, and identify the exact remaining problem. Never disable a security check, change a threat threshold, erase findings, rotate credentials, or upgrade project dependencies as a repair shortcut. If Guard Dog cannot start at all, daily self-repair cannot run: diagnose the executable or run the pinned installer again, preserving settings.
 
-7. Explain how to use `myos-guard-dog install <npm-package>` before future installations. This command checks the resolved dependency tree and artifact hashes, requires completed checks, and keeps lifecycle scripts disabled. Direct npm/pip commands bypass this protection. Unsupported installation types are blocked with an explanation. A Git hook runs after dependencies may already be installed and is not a replacement for the install gate.
+7. Demonstrate the keyless read-only check `myos-guard-dog artifact npm:lodash@4.17.21` and explain that bounded static source inspection cannot certify a package safe. Explain how to use `myos-guard-dog install <npm-package>` before future installations. This command checks the resolved dependency tree, verifies and inspects exact archive bytes, requires completed checks, and keeps lifecycle scripts disabled. Direct npm/pip commands bypass this protection. Unsupported installation types are blocked with an explanation. A Git hook runs after dependencies may already be installed and is not a replacement for the install gate.
 
 8. Leave a short completion report: installed version and path, scan roots, number of exact versions checked, findings, missing coverage, VirusTotal authentication and report freshness, OS schedule and time, last completed run, repairs performed, and anything I need to do. If a step failed, say setup is incomplete and give the next specific action.
 

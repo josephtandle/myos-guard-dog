@@ -60,6 +60,25 @@ test('failed pattern check leaves install coverage incomplete', async () => {
   assert.equal(result.installAllowed, false);
 });
 
+test('analyzer failure reaches the actual GuardDog install verdict', async () => {
+  const { GuardDog } = await import('../src/index.js');
+  const dog = Object.create(GuardDog.prototype);
+  dog.scanner = { scan: async () => ({ success: true, found: true, maliciousVotes: 0, suspiciousVotes: 0 }) };
+  dog.reputation = { checkReputation: async () => ({ ecosystem: 'npm', registry: { version: '1.0.0' }, signals: [] }) };
+  dog.cveChecker = { checkCVEs: async () => ({ status: 'complete', found: false, severity: {}, vulnerabilities: [] }) };
+  dog.patternAnalyzer = { analyzeFiles: () => { throw new Error('fixture analyzer failure'); } };
+  const { DecisionTree } = await import('../src/decision-tree.js');
+  dog.decisionTree = new DecisionTree({ decisionThresholds: {} }, { trustedProviders: [], trustedNamespaces: [] });
+  dog.saveScanHistory = () => {};
+  const log = console.log, error = console.error;
+  console.log = () => {}; console.error = () => {};
+  try {
+    const result = await dog.analyze('fixture', 'npm', 'a'.repeat(64), '1.0.0');
+    assert.equal(result.decision.coverage, 'incomplete');
+    assert.equal(result.decision.installAllowed, false);
+  } finally { console.log = log; console.error = error; }
+});
+
 test('trusted-provider names are scoped to their own ecosystem', async () => {
   const { DecisionTree } = await import('../src/decision-tree.js');
   const tree = new DecisionTree({ decisionThresholds: {} }, {

@@ -2,7 +2,7 @@
 
 - `README.md`, `QUICKSTART.md`, `GUARD_DOG_PROMPT.md`: supported use and installation.
 - `package.json`, `autonomizer.json`, `CHANGELOG.md`: release identity and history.
-- `src/`: scanner, guarded installer, inventory, verdict, scheduler and quota code.
+- `src/`: scanner, bounded npm artifact inspector, guarded installer, inventory, verdict, scheduler and quota code.
 - `bin/scan-deps.js`, `bin/nightly-scan.js`, `bin/git-precommit-hook.sh`: shipped command helpers.
 - `config/`: default configuration and ecosystem trust lists.
 - `tests/`: offline regression suites.

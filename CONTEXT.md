@@ -3,14 +3,14 @@
 
 ## What It Is
 
-A public package security scanner packaged from the internal `guard-dog` agent and published to GitHub for Mastermind students. Supported guarded npm installs use OSV advisories, registry and GitHub metadata, and optional VirusTotal hash reports. Pattern checks inspect registry description text only; package source code and install scripts are not analyzed.
+A public package security scanner packaged from the internal `guard-dog` agent and published to GitHub for Mastermind students. Supported guarded npm installs use OSV advisories, registry and GitHub metadata, optional VirusTotal hash reports, and bounded static inspection of the exact npm archive. Regular analyze/scan pattern checks inspect registry description text only; `artifact` and guarded install read archive source bytes without extraction or execution.
 
 OSV advisory checks work without an API key. VirusTotal is optional for analysis, but guarded installs require a fresh VirusTotal result for the exact artifact and remain blocked without one.
 
 ## URLs / Access
 
 - GitHub: https://github.com/josephtandle/myos-guard-dog
-- Install after the v4.0.4 tag is published: `npm install -g --ignore-scripts github:josephtandle/myos-guard-dog#v4.0.4 && myos-guard-dog setup --quick`
+- Install after the v4.1.0 tag is published: `npm install -g --ignore-scripts github:josephtandle/myos-guard-dog#v4.1.0 && myos-guard-dog setup --quick`. Until then, v4.0.3 is the latest public tag.
 
 ## App Location
 

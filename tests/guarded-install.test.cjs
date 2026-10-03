@@ -27,7 +27,7 @@ test('resolves and approves transitive artifacts before modifying project or ins
   };
   class Dog { async analyze(...args) { scans.push(args); return {decision:{installAllowed:true}}; } }
   try {
-    await runGuardedInstall(['direct'], Dog, {platform:'linux',cwd,runner,fetchArtifact:async()=>bytes,fetchMetadata:async(name,version)=>({name,version,dist:{tarball:`https://registry.npmjs.org/${name}/-/${name}-${version}.tgz`,integrity}})});
+    await runGuardedInstall(['direct'], Dog, {platform:'linux',cwd,runner,fetchArtifact:async()=>bytes,inspectArtifact:()=>({risk:'none'}),fetchMetadata:async(name,version)=>({name,version,dist:{tarball:`https://registry.npmjs.org/${name}/-/${name}-${version}.tgz`,integrity}})});
     assert.deepEqual(scans.map(x=>[x[0],x[3]]), [['direct','1.0.0'],['child','2.0.0']]);
     assert.equal(calls.length, 2);
   } finally { fs.rmSync(cwd, {recursive:true,force:true}); }
@@ -61,7 +61,7 @@ test('unapproved transitive dependency, corrupt artifact and concurrent edit sto
       return {decision:scenario === 'unknown' ? {action:'SILENT'} : {installAllowed:scenario !== 'denied'}};
     } }
     try {
-      await assert.rejects(runGuardedInstall(['child'], Dog, {platform:'linux',cwd,runner,fetchArtifact:async()=>scenario === 'integrity' ? Buffer.from('wrong') : bytes,fetchMetadata:async(name,version)=>({name,version,dist:{tarball:'https://registry.npmjs.org/child/-/child.tgz',integrity}})}));
+      await assert.rejects(runGuardedInstall(['child'], Dog, {platform:'linux',cwd,runner,fetchArtifact:async()=>scenario === 'integrity' ? Buffer.from('wrong') : bytes,inspectArtifact:()=>({risk:'none'}),fetchMetadata:async(name,version)=>({name,version,dist:{tarball:'https://registry.npmjs.org/child/-/child.tgz',integrity}})}));
       assert.equal(executions, 1);
       assert.equal(fs.existsSync(path.join(cwd,'package-lock.json')), false);
       assert.equal(fs.readFileSync(path.join(cwd,'package.json'),'utf8'), original + (scenario === 'changed' ? '\n' : ''));
@@ -94,7 +94,7 @@ test('failed staged install leaves the project manifest, lockfile and node_modul
   class Dog { async analyze() { return { decision: { installAllowed: true } }; } }
   try {
     await assert.rejects(runGuardedInstall(['child'], Dog, {
-      platform: 'linux', cwd, runner, fetchArtifact: async () => bytes,
+      platform: 'linux', cwd, runner, fetchArtifact: async () => bytes, inspectArtifact: () => ({ risk: 'none' }),
       fetchMetadata: async (name, version) => ({ name, version, dist: { tarball: 'https://registry.npmjs.org/child/-/child-2.0.0.tgz', integrity } })
     }), /npm ci failed/);
     assert.equal(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8'), originalManifest);
@@ -179,7 +179,7 @@ test('Windows binds npm-cli.js to its Node installation and passes arguments wit
     return {decision:{installAllowed:true}};
   } }
   try {
-    await runGuardedInstall(['npm','child@2.0.0'],Dog,{platform:'win32',cwd,nodeExecutable,runner,fetchArtifact:async()=>bytes,fetchMetadata:async(name,version)=>({name,version,dist:{tarball:resolved,integrity}})});
+    await runGuardedInstall(['npm','child@2.0.0'],Dog,{platform:'win32',cwd,nodeExecutable,runner,fetchArtifact:async()=>bytes,inspectArtifact:()=>({risk:'none'}),fetchMetadata:async(name,version)=>({name,version,dist:{tarball:resolved,integrity}})});
     assert.equal(commands.length,2);
   } finally {
     if (previousKeys.vt === undefined) delete process.env.VIRUSTOTAL_API_KEY; else process.env.VIRUSTOTAL_API_KEY = previousKeys.vt;

@@ -4,7 +4,7 @@
  * Main orchestrator that coordinates all modules
  */
 
-import { readFileSync, writeFileSync, existsSync, realpathSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, realpathSync, statSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
 import { spawnSync } from 'child_process';
@@ -20,6 +20,8 @@ import { DecisionTree } from './decision-tree.js';
 import { ensureGuardogHome, guardogDataDir, guardogEnvPath, packageRoot } from './paths.js';
 import { runGuardedInstall } from './guarded-install.js';
 import { auditExitCode } from './scan-summary.js';
+import { inspectNpmArtifact } from './npm-artifact-inspector.js';
+import { inspectExactNpmRelease } from './npm-artifact-fetch.js';
 import { checkHealth } from './health.js';
 import {
   installGitHook,
@@ -259,7 +261,7 @@ export class GuardDog {
     console.log('🎯 Evaluating threat level...');
     const decision = this.decisionTree.evaluate(
       scanResults, reputationData, packageName,
-      cveResults, patternResults ? { suspicious: patternResults.suspiciousFiles > 0, score: patternResults.totalScore, severity: patternResults.combinedSeverity, scope: patternResults.scope } : null,
+      cveResults, patternResults ? { suspicious: patternResults.suspiciousFiles > 0, score: patternResults.totalScore, severity: patternResults.combinedSeverity, scope: patternResults.scope, failed: patternResults.failed === true } : null,
       vtAttempted
     );
     if (ecosystem === 'pypi' && reputationData?.registry?.selectedDistribution) {
@@ -435,6 +437,7 @@ function usage() {
   console.log('  myos-guard-dog test                          - Run system test');
   console.log('  myos-guard-dog analyze <pkg> [eco] [target]  - Analyze one package');
   console.log('  myos-guard-dog batch <json-file>             - Batch analyze packages');
+  console.log('  myos-guard-dog artifact <file.tgz|npm:name@version> [--json] - Inspect exact npm archive bytes');
   console.log('  myos-guard-dog install [npm] <package>       - Gate exact npm artifacts; scripts stay disabled');
   console.log('  myos-guard-dog scan <project> [--json]       - Audit exact installed or locked npm versions');
   console.log('  myos-guard-dog nightly                       - Repair local health and scan configured roots');
@@ -554,6 +557,24 @@ async function main(argv = process.argv.slice(2)) {
     const packages = JSON.parse(readFileSync(filePath, 'utf-8'));
     const results = await guardDog.batchAnalyze(packages);
     process.exitCode = auditExitCode(results);
+  } else if (command === 'artifact') {
+    const file = args[1];
+    if (!file || file.startsWith('--')) throw new Error('Usage: myos-guard-dog artifact <file.tgz|npm:name@version> [--json]');
+    let report;
+    try {
+      if (file.startsWith('npm:')) report = await inspectExactNpmRelease(file);
+      else {
+        if (statSync(file).size > 50 * 1024 * 1024) throw new Error('Package archive exceeds compressed scan limit');
+        report = { source: 'local_archive', ...inspectNpmArtifact(readFileSync(file)) };
+      }
+    } catch (error) { error.exitCode = 2; throw error; }
+    if (args.includes('--json')) console.log(JSON.stringify(report));
+    else {
+      console.log(`Inspected ${report.sourceFiles} source files in ${report.entries} archive entries; bounded static coverage.`);
+      for (const finding of report.findings) console.log(`${finding.severity.toUpperCase()}: ${finding.file}: ${finding.rule}`);
+      console.log(`Result: ${report.risk}. No static scan can certify a package is safe.`);
+    }
+    process.exitCode = report.risk === 'high' ? 1 : report.risk === 'none' ? 0 : 2;
   } else {
     usage();
     process.exitCode = !command || ['--help', '-h', 'help'].includes(command) ? 0 : 2;

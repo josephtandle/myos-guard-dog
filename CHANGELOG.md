@@ -1,6 +1,11 @@
 # Changelog
 
-## 4.0.4
+## 4.1.0 (draft)
+
+- Add keyless, exact-version npm artifact inspection with verified registry digest or local `.tgz` input. Parse archive bytes in memory with bounded size and entry limits; report lifecycle scripts and correlated source indicators without executing or extracting package code.
+- Gate guarded npm installs on that bounded artifact inspection in addition to existing OSV, registry and VirusTotal checks. High-risk, review and incomplete artifact findings block the guarded install with a file and rule to examine.
+- Make failed pattern checks reach the actual install verdict, and make suspicious project-audit results visible with a nonzero exit status.
+- Fold in the unreleased 4.0.4 candidate fixes below.
 
 - Resolve Windows helpers by absolute system path, reject project-local npm entry points, and keep Guard Dog credentials out of helper and npm child environments.
 - Treat non-registry and unproven dependency origins, lock and install mismatches, and installed-only packages as incomplete inventory coverage.

@@ -1,7 +1,7 @@
 {
   "name": "myos-guard-dog",
-  "version": "4.0.4",
-  "description": "Package advisory, metadata and optional file-hash checks for guarded npm installs",
+  "version": "4.1.0",
+  "description": "Exact package advisories, metadata, bounded npm artifact inspection and guarded installs",
   "main": "src/index.js",
   "type": "module",
   "bin": {

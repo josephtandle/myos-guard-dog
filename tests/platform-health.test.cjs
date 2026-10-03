@@ -136,6 +136,10 @@ test('nightly distinguishes known danger from interrupted or degraded coverage',
     let receipt = runNightly({ roots: [root], healthOptions, run: () => ({ status: 1, stdout: JSON.stringify({ status: 'dangerous', dependencyCount: 1, dangerousCount: 1, issues: [] }) }) });
     assert.equal(receipt.status, 'dangerous');
     assert.equal(receipt.exitCode, 1);
+    receipt = runNightly({ roots: [root], healthOptions, run: () => ({ status: 2, stdout: JSON.stringify({ status: 'suspicious', dependencyCount: 1, dangerousCount: 0, suspiciousCount: 1, issues: [] }) }) });
+    assert.equal(receipt.status, 'suspicious');
+    assert.equal(receipt.suspiciousCount, 1);
+    assert.equal(receipt.exitCode, 2);
     receipt = runNightly({ roots: [root], healthOptions, run: () => ({ status: 2, stdout: JSON.stringify({ status: 'incomplete', dependencyCount: 1, dangerousCount: 1, issues: ['OSV unavailable'] }) }) });
     assert.equal(receipt.status, 'incomplete');
     assert.equal(receipt.dangerousCount, 1);
