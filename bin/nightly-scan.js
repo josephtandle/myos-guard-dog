@@ -72,11 +72,20 @@ function performNightly(options) {
     else discover(root);
   }
   if (roots.length === 0) receipt.issues.push('No scan roots configured. Run myos-guard-dog setup or set GUARDOG_WORKSPACE.');
+  // One large manifest throttled by VirusTotal pacing (4 lookups/min) used to
+  // consume the whole nightly budget. Cap each manifest so a slow or stuck
+  // project is skipped with a logged issue and the rest still get scanned.
+  const manifestTimeoutMs = Number(options.manifestTimeoutMs ?? process.env.GUARDOG_MANIFEST_TIMEOUT_MS ?? 900000);
   for (const manifest of manifests) {
     const remaining = deadline - Date.now();
     if (remaining <= 0) { receipt.issues.push('Nightly scan time budget exhausted.'); break; }
-    const result = run(process.execPath, [join(packageRoot(), 'bin', 'scan-deps.js'), manifest, '--json'], { encoding: 'utf8', timeout: remaining, maxBuffer: 8 * 1024 * 1024, windowsHide: true });
+    const timeout = Number.isFinite(manifestTimeoutMs) && manifestTimeoutMs > 0 ? Math.min(remaining, manifestTimeoutMs) : remaining;
+    const result = run(process.execPath, [join(packageRoot(), 'bin', 'scan-deps.js'), manifest, '--json'], { encoding: 'utf8', timeout, killSignal: 'SIGKILL', maxBuffer: 8 * 1024 * 1024, windowsHide: true });
     receipt.projectsScanned++;
+    if (result.error?.code === 'ETIMEDOUT' || (result.status === null && result.signal)) {
+      receipt.issues.push('Scan timed out after ' + timeout + 'ms and was skipped: ' + manifest);
+      continue;
+    }
     try {
       const summary = JSON.parse(result.stdout);
       if (!Number.isInteger(summary.dependencyCount) || summary.dependencyCount < 0 || !['complete', 'dangerous', 'incomplete'].includes(summary.status)) throw new Error('invalid scan summary');

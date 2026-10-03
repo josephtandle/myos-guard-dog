@@ -36,4 +36,12 @@ if [ -z "$GUARD_DOG_NODE" ]; then
   done
 fi
 GUARD_DOG_NODE="${GUARD_DOG_NODE:-node}"
-GUARDOG_WORKSPACE="$WORKSPACE" "$GUARD_DOG_NODE" "$GUARD_DOG_DIR/bin/nightly-scan.js"
+# Hard external cap: nightly-scan has a 1h internal budget; never let it hold
+# the slot past that (TERM at 65 min, KILL 60s later). Exit 124/137 = capped.
+CAP_SECONDS="${GUARD_DOG_NIGHTLY_CAP_SECONDS:-3900}"
+TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || true)"
+if [ -n "$TIMEOUT_BIN" ]; then
+  GUARDOG_WORKSPACE="$WORKSPACE" "$TIMEOUT_BIN" -k 60 "$CAP_SECONDS" "$GUARD_DOG_NODE" "$GUARD_DOG_DIR/bin/nightly-scan.js"
+else
+  GUARDOG_WORKSPACE="$WORKSPACE" "$GUARD_DOG_NODE" "$GUARD_DOG_DIR/bin/nightly-scan.js"
+fi
