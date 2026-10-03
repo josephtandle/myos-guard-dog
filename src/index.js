@@ -320,14 +320,19 @@ export class GuardDog {
   async batchAnalyze(packages) {
     console.log(`\n🐕 Guard Dog batch analysis: ${packages.length} packages\n`);
     
-    const results = [];
-    for (const pkg of packages) {
-      const result = await this.analyze(pkg.name, pkg.ecosystem, pkg.target, pkg.version);
-      results.push(result);
-      
-      // VirusTotal enforces its own request-level queue, including refreshes.
-      await new Promise(resolve => setTimeout(resolve, 250));
-    }
+    const results = new Array(packages.length);
+    let next = 0;
+    const worker = async () => {
+      while (next < packages.length) {
+        const index = next++;
+        const pkg = packages[index];
+        results[index] = await this.analyze(pkg.name, pkg.ecosystem, pkg.target, pkg.version);
+
+        // VirusTotal enforces its own request-level queue, including refreshes.
+        await new Promise(resolve => setTimeout(resolve, 250));
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, packages.length) }, worker));
 
     // Summary
     const dangerous = results.filter(r => r.decision.action === 'BARK').length;

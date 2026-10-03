@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { ensureGuardogHome, guardogHome, packageRoot } from './paths.js';
 
 export const CRON_MARKER = '# guardog-nightly';
+const LEGACY_CRON_MARKERS = [CRON_MARKER, '# guarddog-nightly'];
 const TASK = 'GuardogNightlyScan';
 const RUNNER_HEADER = '// MyOS Guard Dog owned runner. taskClass=security_scan\n';
 const LEGACY_RUNNER_HEADER = '// Guardog owned runner. taskClass=security_scan\n';
@@ -78,7 +79,7 @@ export function inspectSchedule(config = {}, options = {}) {
     if (result.status === 1 && /no crontab for/i.test(result.stderr || '')) return { state: 'missing', registered: false, detail: 'No user crontab.' };
     return { state: 'unknown', registered: false, detail: result.error?.message || result.stderr || 'Cannot inspect crontab.' };
   }
-  const lines = result.stdout.split('\n').filter(line => line.trim().endsWith(CRON_MARKER));
+  const lines = result.stdout.split('\n').filter(line => LEGACY_CRON_MARKERS.some(marker => line.trim().endsWith(marker)));
   if (lines.length === 0) return { state: 'missing', registered: false, detail: 'No MyOS Guard Dog cron entry.' };
   const registered = lines.length === 1 && lines[0] === spec.line;
   return { state: registered ? 'registered' : 'stale', registered, detail: registered ? `Cron registered for ${spec.time} local time.` : 'MyOS Guard Dog cron entry differs from current settings.' };

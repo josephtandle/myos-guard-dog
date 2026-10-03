@@ -244,6 +244,22 @@ test('disabling nightly scans preserves a customized marked cron entry', async (
   assert.equal(cron, customized);
 });
 
+test('legacy guarddog marker is recognized and custom schedule is preserved', async () => {
+  const { inspectSchedule } = await import('../src/scheduler.js');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'guardog-legacy-cron-'));
+  const cron = `30 2 * * * /custom/guard-dog-wrapper # guarddog-nightly\n`;
+  let writes = 0;
+  const run = (_, args) => {
+    if (args[0] === '-l') return { status: 0, stdout: cron };
+    writes++;
+    return { status: 0, stdout: '' };
+  };
+  const result = inspectSchedule({}, { platform: 'linux', home: root, run });
+  assert.equal(result.state, 'stale');
+  assert.equal(result.registered, false);
+  assert.equal(writes, 0);
+});
+
 test('nightly refuses overlap and enforces a finite run budget', async () => {
   const { runNightly } = await import('../bin/nightly-scan.js');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'guardog-lock-'));
