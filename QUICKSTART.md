@@ -14,7 +14,7 @@ myos-guard-dog nightly
 myos-guard-dog doctor --repair
 ```
 
-Use the published v4.1.0 GitHub tag and verify the installed version before scanning student projects.
+Use the v4.1.0 GitHub tag only after verifying it has been published. Check the installed version before scanning student projects.
 
 Start with a keyless, read-only check of an exact public npm release:
 

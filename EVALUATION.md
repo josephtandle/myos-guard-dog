@@ -10,7 +10,7 @@ This review targets a student who wants to inspect a public npm package before i
 | [OpenSSF package-analysis](https://github.com/ossf/package-analysis) | Collects static and dynamic package behavior using isolated workers. | Do not execute downloaded package code in this cross-platform CLI. Dynamic analysis needs an actual sandbox and separate operational controls. |
 | [OpenSSF Scorecard](https://github.com/ossf/scorecard) | Assesses repository practices such as token permissions and vulnerability handling. | Treat repository health as context, never as proof that the published artifact is safe. |
 
-## Delivered in v4.1.0
+## Implemented in the v4.1.0 release candidate
 
 - `myos-guard-dog artifact npm:<name>@<exact-version>` checks the npm registry hostname, release identity and strong digest before a bounded static read of the archive. A local `.tgz` can also be inspected without a registry trust claim. No API key is needed.
 - Guarded npm installs inspect the same exact artifact bytes already bound to registry metadata and integrity. High-risk, review, or incomplete static findings stop the install before `npm ci`; lifecycle scripts stay disabled.
