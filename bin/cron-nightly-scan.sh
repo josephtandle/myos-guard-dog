@@ -26,4 +26,14 @@ node "$HOME/.myos/workspace/agents/revenue-pulse/bin/check-revenue-pulse-freshne
 # Delegate dependency discovery and stopping conditions to the released nightly
 # runner. It uses the cross-process VirusTotal daily budget and stops the run as
 # soon as that budget is exhausted, unlike the historical per-manifest loop.
-GUARDOG_WORKSPACE="$WORKSPACE" node "$GUARD_DOG_DIR/bin/nightly-scan.js"
+# Guard Dog pins Node 24 (.nvmrc, engines, src/node-version.js). Homebrew's
+# default `node` is 26 on the Studio, which made every nightly run exit 1 with
+# ERR_UNSUPPORTED_NODE_VERSION. Prefer a Node 24 binary when one is installed.
+GUARD_DOG_NODE="${GUARD_DOG_NODE:-}"
+if [ -z "$GUARD_DOG_NODE" ]; then
+  for candidate in /opt/homebrew/opt/node@24/bin/node /usr/local/opt/node@24/bin/node; do
+    if [ -x "$candidate" ]; then GUARD_DOG_NODE="$candidate"; break; fi
+  done
+fi
+GUARD_DOG_NODE="${GUARD_DOG_NODE:-node}"
+GUARDOG_WORKSPACE="$WORKSPACE" "$GUARD_DOG_NODE" "$GUARD_DOG_DIR/bin/nightly-scan.js"
